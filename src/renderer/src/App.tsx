@@ -770,7 +770,7 @@ const NavBar = memo(function NavBar({ activeTab, onNavigate, onBack, onForward, 
   p.onNavigate === n.onNavigate &&
   p.onBack     === n.onBack     &&
   p.onReload   === n.onReload &&
-  p.onMenuClick === n.onMenuClick,
+  p.onOpenHistory === n.onOpenHistory,
 )
 
 /* ────────────────────────────────────────────────────────
