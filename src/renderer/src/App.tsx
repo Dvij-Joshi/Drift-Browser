@@ -14,7 +14,7 @@
  *   first navigates away from the new-tab page
  */
 
-import { useState, useEffect, useRef, useCallback, useReducer, memo } from 'react'
+import { useState, useEffect, useRef, useCallback, useReducer, memo, useMemo } from 'react'
 import type { WebviewTag } from './webview.d'
 import bgImage from './assets/bg.jpg'
 
@@ -94,6 +94,7 @@ export function clearHistory() {
    Constants
 ──────────────────────────────────────────────────────── */
 const NEW_TAB_URL = 'drift://new-tab'
+const HISTORY_URL = 'drift://history'
 
 const SHORTCUTS: Shortcut[] = [
   { id: 'gh',   label: 'GitHub', letter: 'G', url: 'https://github.com' },
@@ -106,9 +107,12 @@ let _nextId = 1
 const uid = () => `t${_nextId++}`
 
 function makeTab(url = NEW_TAB_URL): Tab {
+  const isHist = url === HISTORY_URL
+  const isNew = url === NEW_TAB_URL || !url || url === 'about:blank'
   return {
-    id: uid(), url, pendingUrl: isNewTabUrl(url) ? '' : url,
-    title: 'New Tab', favicon: 'home',
+    id: uid(), url, pendingUrl: (isNew || isHist) ? '' : url,
+    title: isHist ? 'History' : 'New Tab', 
+    favicon: isHist ? 'history' : 'home',
     active: true, isLoading: false, canGoBack: false, canGoForward: false,
   }
 }
@@ -119,12 +123,15 @@ function makeTab(url = NEW_TAB_URL): Tab {
 function isNewTabUrl(url: string): boolean {
   return !url || url === NEW_TAB_URL || url === 'about:blank'
 }
+function isHistoryUrl(url: string): boolean {
+  return url === HISTORY_URL
+}
 
 /** Parse raw address-bar input into a navigable URL */
 function parseInput(raw: string): string {
   const s = raw.trim()
   if (!s) return NEW_TAB_URL
-  if (s === NEW_TAB_URL) return NEW_TAB_URL
+  if (s === NEW_TAB_URL || s === HISTORY_URL) return s
   // Already a full URL
   if (/^https?:\/\//i.test(s)) return s
   if (/^file:\/\//i.test(s))   return s
@@ -137,7 +144,7 @@ function parseInput(raw: string): string {
 
 /** Pretty-print URL for the address bar */
 function prettyUrl(url: string): string {
-  if (isNewTabUrl(url)) return ''
+  if (isNewTabUrl(url) || isHistoryUrl(url)) return ''
   try {
     const { hostname, pathname, search } = new URL(url)
     const path = (pathname + search).replace(/\/$/, '')
@@ -311,7 +318,7 @@ const WebviewLayer = memo(function WebviewLayer({
   return (
     <div style={{ position: 'absolute', inset: 0, zIndex: 3 }}>
       {tabs
-        .filter(t => !isNewTabUrl(t.url))
+        .filter(t => !isNewTabUrl(t.url) && !isHistoryUrl(t.url))
         .map(t => (
           <TabWebview
             key={t.id}
@@ -581,7 +588,7 @@ function HistoryOverlay({ onClose, onNavigate }: { onClose: () => void; onNaviga
   const formatTime = (ts: number) => new Date(ts).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
 
   return (
-    <div style={S.historyPage} onClick={onClose}>
+    <div style={S.historyPage}>
       <div style={S.historyPageContent} onClick={e => e.stopPropagation()}>
         
         {/* Top Navigation / Close */}
@@ -629,7 +636,7 @@ function HistoryOverlay({ onClose, onNavigate }: { onClose: () => void; onNaviga
                       key={i} 
                       className="drift-history-page-item" 
                       style={S.historyPageItem} 
-                      onClick={() => { onNavigate(h.url); onClose() }}
+                      onClick={() => onNavigate(h.url)}
                     >
                       <div style={S.historyPageItemLeft}>
                         <div style={S.historyPageIconWrapper}>
@@ -858,13 +865,13 @@ const NavBar = memo(function NavBar({ activeTab, onNavigate, onBack, onForward, 
 ──────────────────────────────────────────────────────── */
 export default function App() {
   const [tabs, dispatch] = useReducer(tabReducer, [makeTab()])
-  const [showHistory, setShowHistory] = useState(false)
-
+  
   // Map of tabId → live WebviewTag element for imperative control
   const webviews = useRef<Map<string, WebviewTag>>(new Map())
 
   const activeTab = tabs.find(t => t.active)
-  const showNewTab = !activeTab || isNewTabUrl(activeTab.url)
+  const showNewTab = activeTab && isNewTabUrl(activeTab.url)
+  const showHistoryPage = activeTab && isHistoryUrl(activeTab.url)
 
   /* ── Stable callbacks (never recreated) ─── */
   const handleTabUpdate = useCallback((id: string, patch: Partial<Tab>) => {
@@ -899,7 +906,16 @@ export default function App() {
       return
     }
 
-    if (isNewTabUrl(activeTab.url)) {
+    if (isHistoryUrl(url)) {
+      // Navigate to history page
+      dispatch({ type: 'PATCH', id: activeTab.id, patch: {
+        url: HISTORY_URL, pendingUrl: '', title: 'History', favicon: 'history',
+        isLoading: false, canGoBack: false, canGoForward: false,
+      }})
+      return
+    }
+
+    if (isNewTabUrl(activeTab.url) || isHistoryUrl(activeTab.url)) {
       // First real navigation for this tab — update url to mount the webview
       dispatch({ type: 'PATCH', id: activeTab.id, patch: { url, pendingUrl: url, isLoading: true } })
     } else {
@@ -929,8 +945,15 @@ export default function App() {
           <NewTabDashboard onNavigate={navigate} />
         </div>
 
+        {/* History Page */}
+        {showHistoryPage && (
+          <div style={{ ...S.newTabLayer, display: 'block', zIndex: 10 }}>
+            <HistoryOverlay onClose={() => goBack()} onNavigate={navigate} />
+          </div>
+        )}
+
         {/* Thin loading indicator at top of content */}
-        <LoadingBar loading={!showNewTab && (activeTab?.isLoading ?? false)} />
+        <LoadingBar loading={!showNewTab && !showHistoryPage && (activeTab?.isLoading ?? false)} />
 
         {/* All live webviews — only active one is display:flex */}
         <WebviewLayer
@@ -950,11 +973,9 @@ export default function App() {
           onBack={goBack}
           onForward={goForward}
           onReload={reload}
-          onOpenHistory={() => setShowHistory(true)}
+          onOpenHistory={() => addTab(HISTORY_URL)}
         />
       </div>
-
-      {showHistory && <HistoryOverlay onClose={() => setShowHistory(false)} onNavigate={navigate} />}
     </div>
   )
 }
@@ -1007,10 +1028,10 @@ const S: Record<string, React.CSSProperties> = {
 
   /* History Page (Full Screen) */
   historyPage: {
-    position: 'fixed',
+    position: 'absolute',
     top: 0, left: 0, right: 0, bottom: 0,
     backgroundColor: 'var(--zen-1)', // Solid cream background
-    zIndex: 1000,
+    zIndex: 10,
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
