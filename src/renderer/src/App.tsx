@@ -886,7 +886,7 @@ const S: Record<string, React.CSSProperties> = {
     animation: 'drift-loading 1.4s ease-in-out infinite',
   },
 
-  /* Bottom strip — floats over the webview as a glass card */
+  /* Bottom strip — transparent spacer; individual bars float as pills */
   bottomStrip: {
     position: 'fixed',
     bottom: 14,
@@ -896,14 +896,9 @@ const S: Record<string, React.CSSProperties> = {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'stretch',
-    padding: '8px 10px 10px',
-    gap: 5,
-    background: 'rgba(242,236,226,0.88)',
-    backdropFilter: 'blur(24px)',
-    WebkitBackdropFilter: 'blur(24px)',
-    borderRadius: 18,
-    border: '1px solid rgba(200,185,165,0.32)',
-    boxShadow: '0 8px 32px rgba(100,80,60,0.13), 0 1px 0 rgba(255,255,255,0.6) inset',
+    padding: '0',
+    gap: 6,
+    background: 'transparent',
   },
 
   /* Tab bar */
