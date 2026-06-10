@@ -887,8 +887,10 @@ export default function App() {
     dispatch({ type: 'ADD', tab: makeTab(url) })
   }, [])
 
-  /* ── Tab management ─── */
-  const addTab    = useCallback(() => dispatch({ type: 'ADD',   tab: makeTab() }), [])
+  const addTab    = useCallback((url?: string | React.MouseEvent) => {
+    const finalUrl = typeof url === 'string' ? url : NEW_TAB_URL
+    dispatch({ type: 'ADD', tab: makeTab(finalUrl) })
+  }, [])
   const closeTab  = useCallback((id: string) => dispatch({ type: 'CLOSE',  id }), [])
   const switchTab = useCallback((id: string) => dispatch({ type: 'SWITCH', id }), [])
 
