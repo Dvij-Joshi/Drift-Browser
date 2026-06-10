@@ -116,3 +116,29 @@ input {
   border-color: var(--zen-4) !important;
 }
 
+/* URL input focus */
+.drift-url-input:focus {
+  text-align: left !important;
+}
+
+/* Loading bar keyframe animation */
+@keyframes drift-loading {
+  0%   { transform: translateX(-100%); width: 40%; }
+  50%  { transform: translateX(60%);   width: 60%; }
+  100% { transform: translateX(200%);  width: 40%; }
+}
+
+/* Spinning progress icon for loading tabs */
+@keyframes drift-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+.drift-tab .material-symbols-outlined[style*="progress_activity"] {
+  animation: drift-spin 0.8s linear infinite;
+}
+
+/* Tab hover */
+.drift-tab:hover {
+  filter: brightness(0.96);
+}
+
