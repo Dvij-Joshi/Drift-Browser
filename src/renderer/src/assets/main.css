@@ -1,0 +1,118 @@
+/* ============================================================
+   Drift Browser — Global Styles
+   ============================================================ */
+
+/* --- CSS Custom Properties (Design Tokens) --- */
+:root {
+  --zen-1: #F5EFE6;
+  --zen-2: #E8DFCA;
+  --zen-3: #AEBDCA;
+  --zen-4: #7895B2;
+  --zen-5: #4a6a87;
+
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-mono: 'Geist Mono', 'Courier New', monospace;
+
+  --radius-pill: 9999px;
+  --radius-card: 1.25rem;
+
+  --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-smooth: 300ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-spring: 400ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* --- Reset --- */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body, #root {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--zen-4);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  user-select: none;
+}
+
+/* --- Material Symbols --- */
+.material-symbols-outlined {
+  font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  vertical-align: middle;
+}
+
+/* --- Scrollbar Hide Utility --- */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* --- Button Reset --- */
+button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  color: inherit;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* --- Input Reset --- */
+input {
+  font-family: inherit;
+  border: none;
+  outline: none;
+  background: none;
+}
+/* --- Hover Utilities (can't be done with inline styles) --- */
+
+/* Tab close button: show on parent hover */
+.drift-tab:hover .drift-tab-close {
+  opacity: 1 !important;
+}
+.drift-tab-close:hover {
+  background: rgba(174, 189, 202, 0.4);
+}
+
+/* New tab button hover */
+.drift-new-tab:hover {
+  background: var(--zen-3) !important;
+}
+
+/* Nav button hover */
+.drift-nav-btn:hover {
+  color: var(--zen-5) !important;
+}
+
+/* Search input focus */
+.drift-search:focus {
+  border-color: var(--zen-4) !important;
+  background: rgba(245, 239, 230, 0.97) !important;
+  box-shadow: 0 0 0 4px rgba(120, 149, 178, 0.12) !important;
+}
+
+/* Shortcut icon hover */
+.drift-shortcut:hover .drift-shortcut-icon {
+  background: var(--zen-3) !important;
+  transform: translateY(-2px);
+}
+
+/* Pomodoro widget hover */
+.drift-pomodoro:hover {
+  border-color: var(--zen-4) !important;
+}
+
