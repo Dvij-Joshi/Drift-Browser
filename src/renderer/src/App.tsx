@@ -700,6 +700,7 @@ const NavBar = memo(function NavBar({ activeTab, onNavigate, onBack, onForward, 
             {suggestions.map((s, i) => (
               <div
                 key={i}
+                className="drift-suggestion-item"
                 style={{
                   ...S.suggestionItem,
                   background: i === selectedIndex ? 'rgba(0,0,0,0.06)' : 'transparent'
@@ -912,7 +913,7 @@ const S: Record<string, React.CSSProperties> = {
   historyModal: {
     width: 360,
     maxHeight: '60vh',
-    background: 'var(--zen-bg)',
+    background: 'var(--zen-1)',
     borderRadius: 20,
     boxShadow: '0 12px 48px rgba(0,0,0,0.15), 0 1px 0 rgba(255,255,255,0.8) inset',
     border: '1px solid rgba(200,185,165,0.3)',
@@ -922,11 +923,11 @@ const S: Record<string, React.CSSProperties> = {
   },
   historyHeader: {
     padding: '16px 20px',
-    borderBottom: '1px solid rgba(200,185,165,0.2)',
+    borderBottom: '1px solid var(--zen-2)',
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    color: 'var(--zen-6)',
+    color: 'var(--zen-5)',
   },
   clearHistoryBtn: {
     background: 'none',
