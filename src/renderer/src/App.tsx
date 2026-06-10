@@ -199,16 +199,20 @@ const TabWebview = memo(
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [tabId])
 
+    // Capture the src URL exactly once at mount — never change it.
+    // Subsequent navigations are done imperatively via wv.loadURL().
+    // Changing the src prop aborts the ongoing load (root cause of ERR_ABORTED).
+    const mountedUrlRef = useRef(initialUrl)
+
     return (
       <webview
         ref={setRef as unknown as React.Ref<HTMLElement>}
-        src={initialUrl}
+        src={mountedUrlRef.current}
         style={{
           position: 'absolute',
-          inset: 0,
+          top: 0, left: 0, right: 0, bottom: 0,
           width: '100%',
           height: '100%',
-          // Use 'block' not 'flex' — webview is a block-level replaced element
           display: isActive ? 'block' : 'none',
           border: 'none',
           outline: 'none',
@@ -216,11 +220,11 @@ const TabWebview = memo(
       />
     )
   },
-  // Only re-render when the active state flips (or tab id changes on first mount)
+  // Only re-render when active state or tab id changes — NOT on url/title/favicon changes.
+  // url changes would mutate mountedUrlRef.current indirectly via the src prop, aborting loads.
   (prev, next) =>
     prev.isActive === next.isActive &&
-    prev.tabId    === next.tabId    &&
-    prev.initialUrl === next.initialUrl,
+    prev.tabId    === next.tabId,
 )
 
 /* ────────────────────────────────────────────────────────
@@ -683,8 +687,7 @@ export default function App() {
 ──────────────────────────────────────────────────────── */
 const S: Record<string, React.CSSProperties> = {
   root: {
-    display: 'flex',
-    flexDirection: 'column',
+    position: 'relative',
     width: '100vw',
     height: '100vh',
     overflow: 'hidden',
@@ -693,12 +696,11 @@ const S: Record<string, React.CSSProperties> = {
     background: '#F5EFE6',
   },
 
-  /* Content area */
+  /* Content area — fills the FULL viewport so webviews can use 100% height */
   contentArea: {
-    flex: 1,
-    position: 'relative',
+    position: 'absolute',
+    inset: 0,
     overflow: 'hidden',
-    minHeight: 0,
   },
 
   /* New-tab layer fills the content area */
@@ -830,10 +832,10 @@ const S: Record<string, React.CSSProperties> = {
   },
   shortcutLabel: { fontSize: 13, color: 'var(--zen-4)', fontWeight: 400 },
 
-  /* Widgets */
+  /* Widgets — raised above the floating bottom strip (~160px tall + 16px gap + 16px margin) */
   widgets: {
     position: 'absolute',
-    bottom: 24,
+    bottom: 200,
     right: 40,
     zIndex: 5,
     display: 'flex',
@@ -884,17 +886,24 @@ const S: Record<string, React.CSSProperties> = {
     animation: 'drift-loading 1.4s ease-in-out infinite',
   },
 
-  /* Bottom strip */
+  /* Bottom strip — floats over the webview as a glass card */
   bottomStrip: {
-    flexShrink: 0,
+    position: 'fixed',
+    bottom: 14,
+    left: 14,
+    right: 14,
+    zIndex: 500,
     display: 'flex',
     flexDirection: 'column',
-    alignItems: 'center',
-    paddingBottom: 20,
-    paddingTop: 6,
-    paddingInline: 20,
-    gap: 6,
-    background: 'transparent',
+    alignItems: 'stretch',
+    padding: '8px 10px 10px',
+    gap: 5,
+    background: 'rgba(242,236,226,0.88)',
+    backdropFilter: 'blur(24px)',
+    WebkitBackdropFilter: 'blur(24px)',
+    borderRadius: 18,
+    border: '1px solid rgba(200,185,165,0.32)',
+    boxShadow: '0 8px 32px rgba(100,80,60,0.13), 0 1px 0 rgba(255,255,255,0.6) inset',
   },
 
   /* Tab bar */
@@ -903,7 +912,6 @@ const S: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     gap: 5,
     width: '100%',
-    maxWidth: 1080,
     overflowX: 'auto',
     paddingInline: 4,
   },
@@ -957,13 +965,11 @@ const S: Record<string, React.CSSProperties> = {
   navBar: {
     display: 'flex',
     alignItems: 'center',
-    background: 'var(--zen-2)',
+    background: 'rgba(232,223,210,0.8)',
     color: 'var(--zen-4)',
     borderRadius: 9999,
-    padding: '8px 18px',
+    padding: '7px 16px',
     width: '100%',
-    maxWidth: 1080,
-    boxShadow: '0 4px 28px rgba(120,149,178,0.14)',
     gap: 0,
   },
   navActions: {
