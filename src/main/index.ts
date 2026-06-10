@@ -24,6 +24,10 @@ function createWindow(): void {
 
   mainWindow.on('ready-to-show', () => {
     mainWindow.show()
+    // Auto-open DevTools in development for debugging
+    if (is.dev) {
+      mainWindow.webContents.openDevTools({ mode: 'detach' })
+    }
   })
 
   mainWindow.webContents.setWindowOpenHandler((details) => {

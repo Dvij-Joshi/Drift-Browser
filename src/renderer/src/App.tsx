@@ -208,8 +208,8 @@ const TabWebview = memo(
           inset: 0,
           width: '100%',
           height: '100%',
-          // Toggle visibility without destroying the webview / its JS context
-          display: isActive ? 'flex' : 'none',
+          // Use 'block' not 'flex' — webview is a block-level replaced element
+          display: isActive ? 'block' : 'none',
           border: 'none',
           outline: 'none',
         }}
@@ -336,7 +336,9 @@ function NewTabDashboard({ onNavigate }: { onNavigate: (url: string) => void }) 
   }
 
   return (
-    <>
+    // Wrapper must be position:absolute inset:0 so absolutely-positioned
+    // children (bg, overlay, greeting, dashboard) use this as their containing block
+    <div style={{ position: 'absolute', inset: 0, overflow: 'hidden' }}>
       {/* Scenic background */}
       <div style={{ ...S.bg, backgroundImage: `url(${bgImage})` }} />
       <div style={S.bgOverlay} />
@@ -382,7 +384,8 @@ function NewTabDashboard({ onNavigate }: { onNavigate: (url: string) => void }) 
         <PomodoroWidget />
         <WeatherWidget />
       </div>
-    </>
+      {/* end widgets */}
+    </div>
   )
 }
 
