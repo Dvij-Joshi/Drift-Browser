@@ -585,15 +585,16 @@ interface NavBarProps {
   onBack:       () => void
   onForward:    () => void
   onReload:     () => void
-  onMenuClick:  () => void
+  onOpenHistory:() => void
 }
 
-const NavBar = memo(function NavBar({ activeTab, onNavigate, onBack, onForward, onReload, onMenuClick }: NavBarProps) {
+const NavBar = memo(function NavBar({ activeTab, onNavigate, onBack, onForward, onReload, onOpenHistory }: NavBarProps) {
   // Local URL bar state — only syncs from props when the active tab changes
   const [barUrl, setBarUrl] = useState(activeTab ? prettyUrl(activeTab.url) : '')
   const [isFocused, setIsFocused] = useState(false)
   const [suggestions, setSuggestions] = useState<HistoryItem[]>([])
   const [selectedIndex, setSelectedIndex] = useState(-1)
+  const [showMenu, setShowMenu] = useState(false)
   
   const activeId = activeTab?.id
 
@@ -729,9 +730,34 @@ const NavBar = memo(function NavBar({ activeTab, onNavigate, onBack, onForward, 
         <button className="drift-nav-btn" style={S.navBtn} title="Incognito">
           <span className="material-symbols-outlined">visibility_off</span>
         </button>
-        <button className="drift-nav-btn" style={S.navBtn} title="Menu" onClick={onMenuClick}>
-          <span className="material-symbols-outlined">more_vert</span>
-        </button>
+        
+        {/* Three dots menu with dropdown */}
+        <div style={{ position: 'relative' }}>
+          <button className="drift-nav-btn" style={S.navBtn} title="Menu" onClick={() => setShowMenu(p => !p)}>
+            <span className="material-symbols-outlined">more_vert</span>
+          </button>
+          
+          {showMenu && (
+            <>
+              {/* Invisible backdrop to close menu when clicking outside */}
+              <div 
+                style={{ position: 'fixed', inset: 0, zIndex: 699 }} 
+                onClick={() => setShowMenu(false)}
+              />
+              <div style={S.popupMenu}>
+                <div className="drift-menu-item" style={S.popupMenuItem} onClick={() => { onOpenHistory(); setShowMenu(false) }}>
+                  History
+                </div>
+                <div className="drift-menu-item" style={S.popupMenuItem} onClick={() => setShowMenu(false)}>
+                  Downloads
+                </div>
+                <div className="drift-menu-item" style={S.popupMenuItem} onClick={() => setShowMenu(false)}>
+                  Settings
+                </div>
+              </div>
+            </>
+          )}
+        </div>
       </div>
     </nav>
   )
@@ -844,7 +870,7 @@ export default function App() {
           onBack={goBack}
           onForward={goForward}
           onReload={reload}
-          onMenuClick={() => setShowHistory(true)}
+          onOpenHistory={() => setShowHistory(true)}
         />
       </div>
 
@@ -968,6 +994,31 @@ const S: Record<string, React.CSSProperties> = {
     whiteSpace: 'nowrap',
     overflow: 'hidden',
     textOverflow: 'ellipsis',
+  },
+
+  /* Popup Menu (Sharp Corners) */
+  popupMenu: {
+    position: 'absolute',
+    bottom: '100%',
+    right: 0,
+    marginBottom: 12,
+    background: 'var(--zen-1)',
+    border: '1px solid var(--zen-2)',
+    borderRadius: 0, // Sharp corners as requested
+    boxShadow: '0 -4px 24px rgba(0,0,0,0.15)',
+    display: 'flex',
+    flexDirection: 'column',
+    minWidth: 160,
+    zIndex: 700,
+    padding: '4px 0',
+  },
+  popupMenuItem: {
+    padding: '10px 16px',
+    cursor: 'pointer',
+    color: 'var(--zen-5)',
+    fontSize: 13,
+    display: 'flex',
+    alignItems: 'center',
   },
 
   root: {

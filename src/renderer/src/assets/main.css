@@ -142,8 +142,8 @@ input {
   filter: brightness(0.96);
 }
 
-/* History and Suggestion item hover */
-.drift-history-item:hover, .drift-suggestion-item:hover {
+/* History, Suggestion, and Menu item hover */
+.drift-history-item:hover, .drift-suggestion-item:hover, .drift-menu-item:hover {
   background: var(--zen-2) !important;
 }
 
