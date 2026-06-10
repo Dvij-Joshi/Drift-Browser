@@ -769,6 +769,7 @@ const NavBar = memo(function NavBar({ activeTab, onNavigate, onBack, onForward, 
   p.activeTab?.canGoForward === n.activeTab?.canGoForward &&
   p.onNavigate === n.onNavigate &&
   p.onBack     === n.onBack     &&
+  p.onForward  === n.onForward  &&
   p.onReload   === n.onReload &&
   p.onOpenHistory === n.onOpenHistory,
 )
@@ -994,6 +995,31 @@ const S: Record<string, React.CSSProperties> = {
     whiteSpace: 'nowrap',
     overflow: 'hidden',
     textOverflow: 'ellipsis',
+  },
+
+  /* Popup Menu (Sharp Corners) */
+  popupMenu: {
+    position: 'absolute',
+    bottom: '100%',
+    right: 0,
+    marginBottom: 12,
+    background: 'var(--zen-1)',
+    border: '1px solid var(--zen-2)',
+    borderRadius: 0, // Sharp corners as requested
+    boxShadow: '0 -4px 24px rgba(0,0,0,0.15)',
+    display: 'flex',
+    flexDirection: 'column',
+    minWidth: 160,
+    zIndex: 700,
+    padding: '4px 0',
+  },
+  popupMenuItem: {
+    padding: '10px 16px',
+    cursor: 'pointer',
+    color: 'var(--zen-5)',
+    fontSize: 13,
+    display: 'flex',
+    alignItems: 'center',
   },
 
   /* Popup Menu (Sharp Corners) */
