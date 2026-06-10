@@ -44,6 +44,53 @@ type TabAction =
 interface Shortcut { id: string; label: string; letter: string; url: string }
 
 /* ────────────────────────────────────────────────────────
+   History Storage (localStorage)
+──────────────────────────────────────────────────────── */
+export interface HistoryItem {
+  url: string
+  title: string
+  timestamp: number
+}
+
+const HISTORY_KEY = 'drift_history'
+
+export function getHistory(): HistoryItem[] {
+  try {
+    const raw = localStorage.getItem(HISTORY_KEY)
+    if (raw) return JSON.parse(raw)
+  } catch (e) {
+    console.error('Failed to parse history', e)
+  }
+  return []
+}
+
+export function addToHistory(url: string, title: string = 'Loading...') {
+  if (isNewTabUrl(url)) return
+  
+  const history = getHistory()
+  // Remove if it exists recently to bubble it up
+  const filtered = history.filter(h => h.url !== url)
+  
+  filtered.unshift({ url, title, timestamp: Date.now() })
+  if (filtered.length > 500) filtered.length = 500 // cap
+  
+  localStorage.setItem(HISTORY_KEY, JSON.stringify(filtered))
+}
+
+export function updateHistoryTitle(url: string, title: string) {
+  if (isNewTabUrl(url)) return
+  const history = getHistory()
+  if (history.length > 0 && history[0].url === url) {
+    history[0].title = title
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(history))
+  }
+}
+
+export function clearHistory() {
+  localStorage.removeItem(HISTORY_KEY)
+}
+
+/* ────────────────────────────────────────────────────────
    Constants
 ──────────────────────────────────────────────────────── */
 const NEW_TAB_URL = 'drift://new-tab'
@@ -166,12 +213,26 @@ const TabWebview = memo(
         canGoBack: wv.canGoBack(),
         canGoForward: wv.canGoForward(),
       })
-      const onNav    = (e: unknown) => { const ev = e as { url: string }; onUpdate(tabId, {
-        url: ev.url, pendingUrl: ev.url,
-        canGoBack: wv.canGoBack(), canGoForward: wv.canGoForward(),
-      })}
-      const onNavSPA = (e: unknown) => { const ev = e as { url: string; isMainFrame: boolean }; if (ev.isMainFrame) onUpdate(tabId, { url: ev.url, pendingUrl: ev.url }) }
-      const onTitle  = (e: unknown) => { const ev = e as { title: string }; onUpdate(tabId, { title: ev.title || 'New Tab' }) }
+      const onNav    = (e: unknown) => { 
+        const ev = e as { url: string }
+        onUpdate(tabId, {
+          url: ev.url, pendingUrl: ev.url,
+          canGoBack: wv.canGoBack(), canGoForward: wv.canGoForward(),
+        })
+        addToHistory(ev.url)
+      }
+      const onNavSPA = (e: unknown) => { 
+        const ev = e as { url: string; isMainFrame: boolean }
+        if (ev.isMainFrame) {
+          onUpdate(tabId, { url: ev.url, pendingUrl: ev.url })
+          addToHistory(ev.url)
+        }
+      }
+      const onTitle  = (e: unknown) => { 
+        const ev = e as { title: string }
+        onUpdate(tabId, { title: ev.title || 'New Tab' })
+        updateHistoryTitle(wv.getURL(), ev.title)
+      }
       const onFavicon = (e: unknown) => { const ev = e as { favicons: string[] }; if (ev.favicons?.[0]) onUpdate(tabId, { favicon: ev.favicons[0] }) }
       const onNewWin = (e: unknown) => { const ev = e as { url: string }; onNewWindow(ev.url) }
       const onFail   = () => onUpdate(tabId, { isLoading: false })
@@ -479,6 +540,41 @@ const TabBar = memo(function TabBar({ tabs, onSelect, onClose, onNew }: {
 })
 
 /* ────────────────────────────────────────────────────────
+   History Overlay
+──────────────────────────────────────────────────────── */
+function HistoryOverlay({ onClose, onNavigate }: { onClose: () => void; onNavigate: (url: string) => void }) {
+  const [history, setHistory] = useState(getHistory())
+
+  const handleClear = () => {
+    clearHistory()
+    setHistory([])
+  }
+
+  return (
+    <div style={S.historyOverlay} onClick={onClose}>
+      <div style={S.historyModal} onClick={e => e.stopPropagation()}>
+        <div style={S.historyHeader}>
+          <h3 style={{ margin: 0, fontSize: 16, fontWeight: 500 }}>History</h3>
+          <button onClick={handleClear} style={S.clearHistoryBtn}>Clear All</button>
+        </div>
+        <div style={S.historyList}>
+          {history.length === 0 ? (
+            <div style={S.historyEmpty}>No browsing history yet.</div>
+          ) : (
+            history.map((h, i) => (
+              <div key={i} className="drift-history-item" style={S.historyItem} onClick={() => { onNavigate(h.url); onClose() }}>
+                <div style={S.historyItemTitle}>{h.title}</div>
+                <div style={S.historyItemUrl}>{h.url}</div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ────────────────────────────────────────────────────────
    Nav Bar — URL bar + back / forward / reload
    Keeps internal URL state so typing doesn't cause a
    global re-render; syncs in when active tab changes.
@@ -489,21 +585,54 @@ interface NavBarProps {
   onBack:       () => void
   onForward:    () => void
   onReload:     () => void
+  onMenuClick:  () => void
 }
 
-const NavBar = memo(function NavBar({ activeTab, onNavigate, onBack, onForward, onReload }: NavBarProps) {
+const NavBar = memo(function NavBar({ activeTab, onNavigate, onBack, onForward, onReload, onMenuClick }: NavBarProps) {
   // Local URL bar state — only syncs from props when the active tab changes
   const [barUrl, setBarUrl] = useState(activeTab ? prettyUrl(activeTab.url) : '')
+  const [isFocused, setIsFocused] = useState(false)
+  const [suggestions, setSuggestions] = useState<HistoryItem[]>([])
+  const [selectedIndex, setSelectedIndex] = useState(-1)
+  
   const activeId = activeTab?.id
 
   // Sync URL bar when switching tabs OR when the webview finishes navigating
   useEffect(() => {
-    setBarUrl(activeTab ? prettyUrl(activeTab.url) : '')
-  }, [activeId, activeTab?.url])
+    if (!isFocused) {
+      setBarUrl(activeTab ? prettyUrl(activeTab.url) : '')
+    }
+  }, [activeId, activeTab?.url, isFocused])
+
+  // Update suggestions when typing
+  useEffect(() => {
+    if (isFocused && barUrl.trim().length > 0) {
+      const q = barUrl.toLowerCase()
+      const matches = getHistory().filter(h => h.url.toLowerCase().includes(q) || h.title.toLowerCase().includes(q))
+      setSuggestions(matches.slice(0, 6)) // top 6
+      setSelectedIndex(-1)
+    } else {
+      setSuggestions([])
+    }
+  }, [barUrl, isFocused])
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') { onNavigate(barUrl); (e.target as HTMLInputElement).blur() }
-    if (e.key === 'Escape') { setBarUrl(activeTab ? prettyUrl(activeTab.url) : ''); (e.target as HTMLInputElement).blur() }
+    if (e.key === 'Enter') {
+      const target = selectedIndex >= 0 && suggestions[selectedIndex] ? suggestions[selectedIndex].url : barUrl
+      onNavigate(target)
+      setIsFocused(false);
+      (e.target as HTMLInputElement).blur()
+    } else if (e.key === 'Escape') {
+      setBarUrl(activeTab ? prettyUrl(activeTab.url) : '');
+      setIsFocused(false);
+      (e.target as HTMLInputElement).blur()
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      setSelectedIndex(prev => (prev < suggestions.length - 1 ? prev + 1 : prev))
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      setSelectedIndex(prev => (prev > -1 ? prev - 1 : -1))
+    }
   }
 
   const isNewTab = !activeTab || isNewTabUrl(activeTab.url)
@@ -553,10 +682,42 @@ const NavBar = memo(function NavBar({ activeTab, onNavigate, onBack, onForward, 
           placeholder="Search or enter address"
           onChange={e => setBarUrl(e.target.value)}
           onKeyDown={handleKeyDown}
-          onFocus={e => { setBarUrl(activeTab?.url && !isNewTabUrl(activeTab.url) ? activeTab.url : ''); e.target.select() }}
-          onBlur={() => setBarUrl(activeTab ? prettyUrl(activeTab.url) : '')}
+          onFocus={e => { 
+            setIsFocused(true)
+            setBarUrl(activeTab?.url && !isNewTabUrl(activeTab.url) ? activeTab.url : '')
+            e.target.select() 
+          }}
+          onBlur={() => {
+            // Slight delay to allow clicking suggestions
+            setTimeout(() => setIsFocused(false), 200)
+          }}
           spellCheck={false}
         />
+        
+        {/* Autocomplete Dropdown */}
+        {isFocused && suggestions.length > 0 && (
+          <div style={S.suggestionsDropdown}>
+            {suggestions.map((s, i) => (
+              <div
+                key={i}
+                style={{
+                  ...S.suggestionItem,
+                  background: i === selectedIndex ? 'rgba(0,0,0,0.06)' : 'transparent'
+                }}
+                onMouseDown={(e) => {
+                  // onMouseDown fires before input blur, preventing the dropdown from hiding
+                  e.preventDefault()
+                  onNavigate(s.url)
+                  setIsFocused(false)
+                }}
+                onMouseEnter={() => setSelectedIndex(i)}
+              >
+                <div style={S.suggestionTitle}>{s.title}</div>
+                <div style={S.suggestionUrl}>{s.url}</div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Right — utility buttons */}
@@ -567,7 +728,7 @@ const NavBar = memo(function NavBar({ activeTab, onNavigate, onBack, onForward, 
         <button className="drift-nav-btn" style={S.navBtn} title="Incognito">
           <span className="material-symbols-outlined">visibility_off</span>
         </button>
-        <button className="drift-nav-btn" style={S.navBtn} title="Menu">
+        <button className="drift-nav-btn" style={S.navBtn} title="Menu" onClick={onMenuClick}>
           <span className="material-symbols-outlined">more_vert</span>
         </button>
       </div>
@@ -581,8 +742,8 @@ const NavBar = memo(function NavBar({ activeTab, onNavigate, onBack, onForward, 
   p.activeTab?.canGoForward === n.activeTab?.canGoForward &&
   p.onNavigate === n.onNavigate &&
   p.onBack     === n.onBack     &&
-  p.onForward  === n.onForward  &&
-  p.onReload   === n.onReload,
+  p.onReload   === n.onReload &&
+  p.onMenuClick === n.onMenuClick,
 )
 
 /* ────────────────────────────────────────────────────────
@@ -590,6 +751,7 @@ const NavBar = memo(function NavBar({ activeTab, onNavigate, onBack, onForward, 
 ──────────────────────────────────────────────────────── */
 export default function App() {
   const [tabs, dispatch] = useReducer(tabReducer, [makeTab()])
+  const [showHistory, setShowHistory] = useState(false)
 
   // Map of tabId → live WebviewTag element for imperative control
   const webviews = useRef<Map<string, WebviewTag>>(new Map())
@@ -681,8 +843,11 @@ export default function App() {
           onBack={goBack}
           onForward={goForward}
           onReload={reload}
+          onMenuClick={() => setShowHistory(true)}
         />
       </div>
+
+      {showHistory && <HistoryOverlay onClose={() => setShowHistory(false)} onNavigate={navigate} />}
     </div>
   )
 }
@@ -691,6 +856,119 @@ export default function App() {
    Styles — all inline, zero external dependencies
 ──────────────────────────────────────────────────────── */
 const S: Record<string, React.CSSProperties> = {
+  /* Suggestions Dropdown */
+  suggestionsDropdown: {
+    position: 'absolute',
+    bottom: '100%',
+    left: 0,
+    right: 0,
+    marginBottom: 8,
+    background: 'rgba(250,247,242,0.95)',
+    backdropFilter: 'blur(24px)',
+    WebkitBackdropFilter: 'blur(24px)',
+    borderRadius: 16,
+    border: '1px solid rgba(200,185,165,0.4)',
+    boxShadow: '0 -4px 24px rgba(100,80,60,0.1)',
+    overflow: 'hidden',
+    display: 'flex',
+    flexDirection: 'column',
+    padding: '6px 0',
+    zIndex: 600,
+  },
+  suggestionItem: {
+    padding: '8px 16px',
+    cursor: 'pointer',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 2,
+  },
+  suggestionTitle: {
+    fontSize: 13,
+    fontWeight: 500,
+    color: 'var(--zen-6)',
+    whiteSpace: 'nowrap',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+  },
+  suggestionUrl: {
+    fontSize: 11,
+    color: 'var(--zen-4)',
+    whiteSpace: 'nowrap',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+  },
+
+  /* History Overlay */
+  historyOverlay: {
+    position: 'fixed',
+    top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.2)',
+    zIndex: 1000,
+    display: 'flex',
+    alignItems: 'flex-end',
+    justifyContent: 'flex-end',
+    padding: '24px',
+  },
+  historyModal: {
+    width: 360,
+    maxHeight: '60vh',
+    background: 'var(--zen-bg)',
+    borderRadius: 20,
+    boxShadow: '0 12px 48px rgba(0,0,0,0.15), 0 1px 0 rgba(255,255,255,0.8) inset',
+    border: '1px solid rgba(200,185,165,0.3)',
+    display: 'flex',
+    flexDirection: 'column',
+    overflow: 'hidden',
+  },
+  historyHeader: {
+    padding: '16px 20px',
+    borderBottom: '1px solid rgba(200,185,165,0.2)',
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    color: 'var(--zen-6)',
+  },
+  clearHistoryBtn: {
+    background: 'none',
+    border: 'none',
+    color: 'var(--zen-4)',
+    fontSize: 12,
+    cursor: 'pointer',
+  },
+  historyList: {
+    overflowY: 'auto',
+    flex: 1,
+    padding: '8px 0',
+  },
+  historyEmpty: {
+    padding: '32px 20px',
+    textAlign: 'center',
+    color: 'var(--zen-4)',
+    fontSize: 13,
+  },
+  historyItem: {
+    padding: '10px 20px',
+    cursor: 'pointer',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 3,
+  },
+  historyItemTitle: {
+    fontSize: 13,
+    fontWeight: 500,
+    color: 'var(--zen-6)',
+    whiteSpace: 'nowrap',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+  },
+  historyItemUrl: {
+    fontSize: 11,
+    color: 'var(--zen-4)',
+    whiteSpace: 'nowrap',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+  },
+
   root: {
     position: 'relative',
     width: '100vw',
