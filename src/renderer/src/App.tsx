@@ -544,28 +544,107 @@ const TabBar = memo(function TabBar({ tabs, onSelect, onClose, onNew }: {
 ──────────────────────────────────────────────────────── */
 function HistoryOverlay({ onClose, onNavigate }: { onClose: () => void; onNavigate: (url: string) => void }) {
   const [history, setHistory] = useState(getHistory())
+  const [query, setQuery] = useState('')
 
   const handleClear = () => {
     clearHistory()
     setHistory([])
   }
 
+  // Filter and group history items
+  const filtered = useMemo(() => {
+    const q = query.toLowerCase()
+    return history.filter(h => h.url.toLowerCase().includes(q) || h.title.toLowerCase().includes(q))
+  }, [history, query])
+
+  const groups = useMemo(() => {
+    const today = new Date()
+    today.setHours(0,0,0,0)
+    const yesterday = new Date(today)
+    yesterday.setDate(yesterday.getDate() - 1)
+
+    const map = new Map<string, HistoryItem[]>()
+    filtered.forEach(h => {
+      const d = new Date(h.timestamp)
+      d.setHours(0,0,0,0)
+      let label = ''
+      if (d.getTime() === today.getTime()) label = 'TODAY'
+      else if (d.getTime() === yesterday.getTime()) label = 'YESTERDAY'
+      else label = d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }).toUpperCase()
+      
+      if (!map.has(label)) map.set(label, [])
+      map.get(label)!.push(h)
+    })
+    return Array.from(map.entries())
+  }, [filtered])
+
+  const formatTime = (ts: number) => new Date(ts).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
+
   return (
-    <div style={S.historyOverlay} onClick={onClose}>
-      <div style={S.historyModal} onClick={e => e.stopPropagation()}>
-        <div style={S.historyHeader}>
-          <h3 style={{ margin: 0, fontSize: 16, fontWeight: 500 }}>History</h3>
-          <button onClick={handleClear} style={S.clearHistoryBtn}>Clear All</button>
+    <div style={S.historyPage} onClick={onClose}>
+      <div style={S.historyPageContent} onClick={e => e.stopPropagation()}>
+        
+        {/* Top Navigation / Close */}
+        <div style={S.historyTopNav}>
+          <button onClick={onClose} className="drift-nav-btn" style={S.historyBackBtn}>
+            <span className="material-symbols-outlined">arrow_back</span>
+          </button>
         </div>
-        <div style={S.historyList}>
-          {history.length === 0 ? (
-            <div style={S.historyEmpty}>No browsing history yet.</div>
+
+        {/* Search */}
+        <div style={S.historySearchWrapper}>
+          <div className="drift-history-search-box" style={S.historySearchBox}>
+            <span className="material-symbols-outlined" style={{ color: 'var(--zen-4)', marginRight: 16 }}>search</span>
+            <input 
+              className="drift-url-input"
+              style={S.historySearchInput} 
+              placeholder="Search your history..." 
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              autoFocus
+            />
+          </div>
+        </div>
+
+        {/* Header */}
+        <div style={S.historyHeaderContainer}>
+          <h2 style={S.historyPageTitle}>History</h2>
+          <button onClick={handleClear} className="drift-clear-btn" style={S.historyClearBtn}>
+            <span className="material-symbols-outlined" style={{ fontSize: 18 }}>delete</span>
+            Clear History
+          </button>
+        </div>
+
+        {/* List */}
+        <div style={S.historyGroupsContainer} className="no-scrollbar">
+          {groups.length === 0 ? (
+            <div style={S.historyEmptyPage}>No browsing history found.</div>
           ) : (
-            history.map((h, i) => (
-              <div key={i} className="drift-history-item" style={S.historyItem} onClick={() => { onNavigate(h.url); onClose() }}>
-                <div style={S.historyItemTitle}>{h.title}</div>
-                <div style={S.historyItemUrl}>{h.url}</div>
-              </div>
+            groups.map(([label, items]) => (
+              <section key={label} style={S.historyGroup}>
+                <h3 style={S.historyGroupLabel}>{label}</h3>
+                <div style={S.historyGroupItems}>
+                  {items.map((h, i) => (
+                    <div 
+                      key={i} 
+                      className="drift-history-page-item" 
+                      style={S.historyPageItem} 
+                      onClick={() => { onNavigate(h.url); onClose() }}
+                    >
+                      <div style={S.historyPageItemLeft}>
+                        <div style={S.historyPageIconWrapper}>
+                          <span className="material-symbols-outlined" style={{ fontSize: 16 }}>language</span>
+                        </div>
+                        <div style={S.historyPageItemText}>
+                          <div style={S.historyPageItemTitle}>{h.title}</div>
+                          <div style={S.historyPageItemUrl}>{h.url}</div>
+                        </div>
+                      </div>
+                      <span style={S.historyPageItemTime}>{formatTime(h.timestamp)}</span>
+                    </div>
+                  ))}
+                </div>
+              </section>
             ))
           )}
         </div>
@@ -594,6 +673,7 @@ const NavBar = memo(function NavBar({ activeTab, onNavigate, onBack, onForward, 
   const [isFocused, setIsFocused] = useState(false)
   const [suggestions, setSuggestions] = useState<HistoryItem[]>([])
   const [selectedIndex, setSelectedIndex] = useState(-1)
+  const [showMenu, setShowMenu] = useState(false)
   
   const activeId = activeTab?.id
 
@@ -729,9 +809,34 @@ const NavBar = memo(function NavBar({ activeTab, onNavigate, onBack, onForward, 
         <button className="drift-nav-btn" style={S.navBtn} title="Incognito">
           <span className="material-symbols-outlined">visibility_off</span>
         </button>
-        <button className="drift-nav-btn" style={S.navBtn} title="History" onClick={onOpenHistory}>
-          <span className="material-symbols-outlined">more_vert</span>
-        </button>
+        
+        {/* Three dots menu with dropdown */}
+        <div style={{ position: 'relative' }}>
+          <button className="drift-nav-btn" style={S.navBtn} title="Menu" onClick={() => setShowMenu(p => !p)}>
+            <span className="material-symbols-outlined">more_vert</span>
+          </button>
+          
+          {showMenu && (
+            <>
+              {/* Invisible backdrop to close menu when clicking outside */}
+              <div 
+                style={{ position: 'fixed', inset: 0, zIndex: 699 }} 
+                onClick={() => setShowMenu(false)}
+              />
+              <div style={S.popupMenu}>
+                <div className="drift-menu-item" style={S.popupMenuItem} onClick={() => { onOpenHistory(); setShowMenu(false) }}>
+                  History
+                </div>
+                <div className="drift-menu-item" style={S.popupMenuItem} onClick={() => setShowMenu(false)}>
+                  Downloads
+                </div>
+                <div className="drift-menu-item" style={S.popupMenuItem} onClick={() => setShowMenu(false)}>
+                  Settings
+                </div>
+              </div>
+            </>
+          )}
+        </div>
       </div>
     </nav>
   )
@@ -900,75 +1005,203 @@ const S: Record<string, React.CSSProperties> = {
     textOverflow: 'ellipsis',
   },
 
-  /* History Overlay */
-  historyOverlay: {
+  /* History Page (Full Screen) */
+  historyPage: {
     position: 'fixed',
     top: 0, left: 0, right: 0, bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.2)',
+    backgroundColor: 'var(--zen-1)', // Solid cream background
     zIndex: 1000,
     display: 'flex',
-    alignItems: 'flex-end',
-    justifyContent: 'flex-end',
-    padding: '24px',
+    flexDirection: 'column',
+    alignItems: 'center',
+    overflowY: 'auto',
   },
-  historyModal: {
-    width: 360,
-    maxHeight: '60vh',
-    background: 'var(--zen-1)',
-    borderRadius: 20,
-    boxShadow: '0 12px 48px rgba(0,0,0,0.15), 0 1px 0 rgba(255,255,255,0.8) inset',
-    border: '1px solid rgba(200,185,165,0.3)',
+  historyPageContent: {
+    width: '100%',
+    maxWidth: 800,
+    padding: '24px',
     display: 'flex',
     flexDirection: 'column',
-    overflow: 'hidden',
+    alignItems: 'center',
+    minHeight: '100%',
   },
-  historyHeader: {
-    padding: '16px 20px',
-    borderBottom: '1px solid var(--zen-2)',
+  historyTopNav: {
+    width: '100%',
+    display: 'flex',
+    justifyContent: 'flex-start',
+    marginBottom: 16,
+  },
+  historyBackBtn: {
+    width: 40, height: 40,
+    borderRadius: '50%',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    color: 'var(--zen-4)',
+    cursor: 'pointer',
+    background: 'transparent',
+    border: 'none',
+  },
+  historySearchWrapper: {
+    width: '100%',
+    maxWidth: 600,
+    marginBottom: 48,
+  },
+  historySearchBox: {
+    display: 'flex',
+    alignItems: 'center',
+    background: 'var(--zen-1)',
+    border: '1px solid var(--zen-3)',
+    borderRadius: 9999,
+    padding: '12px 24px',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
+    transition: 'all 0.3s ease',
+  },
+  historySearchInput: {
+    flex: 1,
+    border: 'none',
+    background: 'transparent',
+    outline: 'none',
+    fontSize: 16,
+    color: 'var(--zen-5)',
+    fontWeight: 500,
+  },
+  historyHeaderContainer: {
+    width: '100%',
+    maxWidth: 700,
     display: 'flex',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-end',
+    borderBottom: '1px solid var(--zen-2)',
+    paddingBottom: 16,
+    marginBottom: 16,
+  },
+  historyPageTitle: {
+    fontSize: 40,
+    fontWeight: 600,
     color: 'var(--zen-5)',
+    margin: 0,
+    lineHeight: 1,
+    letterSpacing: '-0.02em',
   },
-  clearHistoryBtn: {
-    background: 'none',
-    border: 'none',
-    color: 'var(--zen-4)',
-    fontSize: 12,
-    cursor: 'pointer',
-  },
-  historyList: {
-    overflowY: 'auto',
-    flex: 1,
-    padding: '8px 0',
-  },
-  historyEmpty: {
-    padding: '32px 20px',
-    textAlign: 'center',
-    color: 'var(--zen-4)',
-    fontSize: 13,
-  },
-  historyItem: {
-    padding: '10px 20px',
-    cursor: 'pointer',
+  historyClearBtn: {
     display: 'flex',
-    flexDirection: 'column',
-    gap: 3,
-  },
-  historyItemTitle: {
+    alignItems: 'center',
+    gap: 8,
+    padding: '8px 16px',
+    borderRadius: 9999,
+    background: 'var(--zen-2)',
+    color: 'var(--zen-5)',
+    border: '1px solid transparent',
     fontSize: 13,
     fontWeight: 500,
-    color: 'var(--zen-6)',
+    cursor: 'pointer',
+    transition: 'all 0.2s ease',
+  },
+  historyGroupsContainer: {
+    width: '100%',
+    maxWidth: 700,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 32,
+    paddingBottom: 64,
+  },
+  historyEmptyPage: {
+    padding: '64px 20px',
+    textAlign: 'center',
+    color: 'var(--zen-4)',
+    fontSize: 15,
+  },
+  historyGroup: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 12,
+  },
+  historyGroupLabel: {
+    fontSize: 11,
+    fontWeight: 700,
+    color: 'var(--zen-4)',
+    letterSpacing: '0.08em',
+    margin: '0 0 0 12px',
+  },
+  historyGroupItems: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 6,
+  },
+  historyPageItem: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: '12px 16px',
+    borderRadius: 16,
+    background: 'var(--zen-2)',
+    border: '1px solid var(--zen-2)',
+    cursor: 'pointer',
+    transition: 'all 0.2s ease',
+  },
+  historyPageItemLeft: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 16,
+    minWidth: 0,
+  },
+  historyPageIconWrapper: {
+    width: 36, height: 36,
+    borderRadius: '50%',
+    background: 'var(--zen-3)',
+    color: 'var(--zen-1)',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    flexShrink: 0,
+  },
+  historyPageItemText: {
+    display: 'flex',
+    flexDirection: 'column',
+    minWidth: 0,
+  },
+  historyPageItemTitle: {
+    fontSize: 15,
+    fontWeight: 500,
+    color: 'var(--zen-5)',
     whiteSpace: 'nowrap',
     overflow: 'hidden',
     textOverflow: 'ellipsis',
   },
-  historyItemUrl: {
-    fontSize: 11,
+  historyPageItemUrl: {
+    fontSize: 13,
     color: 'var(--zen-4)',
     whiteSpace: 'nowrap',
     overflow: 'hidden',
     textOverflow: 'ellipsis',
+  },
+  historyPageItemTime: {
+    fontSize: 13,
+    color: 'var(--zen-4)',
+    flexShrink: 0,
+    marginLeft: 16,
+  },
+
+  /* Popup Menu (Sharp Corners) */
+  popupMenu: {
+    position: 'absolute',
+    bottom: '100%',
+    right: 0,
+    marginBottom: 12,
+    background: 'var(--zen-1)',
+    border: '1px solid var(--zen-2)',
+    borderRadius: 0, // Sharp corners as requested
+    boxShadow: '0 -4px 24px rgba(0,0,0,0.15)',
+    display: 'flex',
+    flexDirection: 'column',
+    minWidth: 160,
+    zIndex: 700,
+    padding: '4px 0',
+  },
+  popupMenuItem: {
+    padding: '10px 16px',
+    cursor: 'pointer',
+    color: 'var(--zen-5)',
+    fontSize: 13,
+    display: 'flex',
+    alignItems: 'center',
   },
 
   /* Popup Menu (Sharp Corners) */
