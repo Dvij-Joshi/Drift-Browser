@@ -209,11 +209,16 @@ const TabWebview = memo(
         ref={setRef as unknown as React.Ref<HTMLElement>}
         src={mountedUrlRef.current}
         style={{
-          position: 'absolute',
-          top: 0, left: 0, right: 0, bottom: 0,
-          width: '100%',
-          height: '100%',
-          display: isActive ? 'block' : 'none',
+          // Electron's <webview> ignores height:100% from positioned ancestors.
+          // position:fixed + explicit viewport units is the only reliable way
+          // to make it fill the screen. The bottom strip sits at zIndex:500.
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100vw',
+          height: '100vh',
+          zIndex: 10,
+          display: isActive ? 'flex' : 'none',
           border: 'none',
           outline: 'none',
         }}
