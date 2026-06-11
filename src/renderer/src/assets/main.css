@@ -123,9 +123,14 @@ input {
 
 /* Loading bar keyframe animation */
 @keyframes drift-loading {
-  0%   { transform: translateX(-100%); width: 40%; }
-  50%  { transform: translateX(60%);   width: 60%; }
-  100% { transform: translateX(200%);  width: 40%; }
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(200%); }
+}
+
+.drift-loading-bar {
+  background: linear-gradient(90deg, transparent, rgba(120, 149, 178, 0.4), var(--zen-4), rgba(120, 149, 178, 0.4), transparent) !important;
+  width: 50% !important;
+  animation: drift-loading 1.2s cubic-bezier(0.4, 0, 0.2, 1) infinite !important;
 }
 
 /* Spinning progress icon for loading tabs */
