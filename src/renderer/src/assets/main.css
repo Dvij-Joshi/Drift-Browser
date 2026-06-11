@@ -167,6 +167,24 @@ input {
   filter: brightness(0.96);
 }
 
+/* Tab Switching Animations */
+@keyframes drift-fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.drift-fade-in {
+  animation: drift-fade-in 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.drift-webview {
+  display: none !important;
+}
+.drift-webview-active {
+  display: flex !important;
+  animation: drift-fade-in 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
 /* History, Suggestion, and Menu item hover */
 .drift-history-item:hover, .drift-suggestion-item:hover, .drift-menu-item:hover {
   background: var(--zen-2) !important;

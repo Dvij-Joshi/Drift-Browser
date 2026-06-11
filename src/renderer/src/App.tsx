@@ -274,6 +274,7 @@ const TabWebview = memo(
 
     return (
       <webview
+        className={`drift-webview ${isActive ? 'drift-webview-active' : ''}`}
         ref={setRef as unknown as React.Ref<HTMLElement>}
         src={mountedUrlRef.current}
         style={{
@@ -286,7 +287,6 @@ const TabWebview = memo(
           width: '100vw',
           height: '100vh',
           zIndex: 10,
-          display: isActive ? 'flex' : 'none',
           border: 'none',
           outline: 'none',
         }}
@@ -951,13 +951,13 @@ export default function App() {
       {/* ── Content area: new-tab dashboard OR webview ── */}
       <div style={S.contentArea}>
         {/* New-tab dashboard — visible when active tab has no URL */}
-        <div style={{ ...S.newTabLayer, display: showNewTab ? 'block' : 'none' }}>
+        <div className={showNewTab ? 'drift-fade-in' : ''} style={{ ...S.newTabLayer, display: showNewTab ? 'block' : 'none' }}>
           <NewTabDashboard onNavigate={navigate} />
         </div>
 
         {/* History Page */}
         {showHistoryPage && (
-          <div style={{ ...S.newTabLayer, display: 'block', zIndex: 10 }}>
+          <div className="drift-fade-in" style={{ ...S.newTabLayer, display: 'block', zIndex: 10 }}>
             <HistoryOverlay onClose={() => goBack()} onNavigate={navigate} />
           </div>
         )}
