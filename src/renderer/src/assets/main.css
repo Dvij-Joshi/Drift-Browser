@@ -144,24 +144,22 @@ input {
 
 /* Tab Entry Animation */
 @keyframes drift-tab-enter {
-  0% { 
-    opacity: 0; 
-    flex: 0.001; 
-    min-width: 0; 
-    padding: 0; 
-    transform: translateY(10px) scale(0.95);
-  }
-  100% { 
-    opacity: 1; 
-    flex: 1; 
-    min-width: 120px; 
-    padding: 0 12px; 
-    transform: translateY(0) scale(1);
-  }
+  0% { opacity: 0; flex: 0.001; min-width: 0; padding: 0; transform: translateY(10px) scale(0.95); }
+  100% { opacity: 1; flex: 1; min-width: 120px; padding: 0 12px; transform: translateY(0) scale(1); }
+}
+
+@keyframes drift-tab-exit {
+  0% { opacity: 1; flex: 1; min-width: 120px; padding: 0 12px; transform: translateY(0) scale(1); }
+  100% { opacity: 0; flex: 0.001; min-width: 0; margin-right: 0; padding: 0; transform: translateY(-10px) scale(0.95); }
 }
 
 .drift-tab {
   animation: drift-tab-enter 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.drift-tab-closing {
+  animation: drift-tab-exit 0.25s cubic-bezier(0.4, 0, 0.2, 1) forwards !important;
+  pointer-events: none;
 }
 
 /* Tab hover */

@@ -488,10 +488,18 @@ const TabItem = memo(
     onSelect: (id: string) => void
     onClose:  (id: string) => void
   }) {
+    const [isClosing, setIsClosing] = useState(false)
     const hasFavicon = tab.favicon.startsWith('http')
+    
+    const handleClose = (e: React.MouseEvent) => {
+      e.stopPropagation()
+      setIsClosing(true)
+      setTimeout(() => onClose(tab.id), 250) // Match animation duration
+    }
+
     return (
       <div
-        className="drift-tab"
+        className={`drift-tab ${isClosing ? 'drift-tab-closing' : ''}`}
         style={{
           ...S.tab,
           background: tab.active ? 'var(--zen-4)' : 'var(--zen-2)',
@@ -510,7 +518,7 @@ const TabItem = memo(
         <button
           className="drift-tab-close"
           style={S.tabClose}
-          onClick={e => { e.stopPropagation(); onClose(tab.id) }}
+          onClick={handleClose}
           title="Close tab"
         >
           <span className="material-symbols-outlined" style={{ fontSize: 12 }}>close</span>
